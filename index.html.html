@@ -130,17 +130,17 @@
             </div>
             <div class="p-8">
                 <form id="login-form" autocomplete="off" onsubmit="handleLogin(event)">
-                    <div class="mb-5 hidden fade-in" id="reg-name-group"><label class="block text-sm font-medium mb-2">Nama Lengkap</label><input type="text" id="reg-name" autocomplete="nope" class="w-full px-4 py-2 border rounded-lg outline-none" placeholder="Nama Anda"></div>
+                    <div class="mb-5 hidden fade-in" id="reg-name-group"><label class="block text-sm font-medium mb-2">Nama Lengkap *</label><input type="text" id="reg-name" autocomplete="nope" class="w-full px-4 py-2 border rounded-lg outline-none" placeholder="Nama Anda"></div>
                     <div class="mb-5 flex flex-col gap-1">
-                        <label class="block text-sm font-medium mb-1 text-gray-700">Peran / Jobdesk User</label>
+                        <label class="block text-sm font-medium mb-1 text-gray-700">Peran / Jobdesk User *</label>
                         <select id="user-role-select" class="w-full px-4 py-2 border rounded-lg outline-none bg-blue-50 border-blue-300 font-semibold text-primary cursor-pointer">
                             <option value="manager">👔 Manager / Project Manager (Akses Penuh)</option>
                             <option value="produksi">🛠️ Pimpinan Produksi / Mandor (Bengkel & QC)</option>
                             <option value="vendor">🚚 Vendor / Supplier Material (Gudang & Sasis)</option>
                         </select>
                     </div>
-                    <div class="mb-5"><label class="block text-sm font-medium mb-2">Email</label><input type="email" id="email" required autocomplete="new-email" class="w-full px-4 py-2 border rounded-lg outline-none" placeholder="email@perusahaan.com"></div>
-                    <div class="mb-6"><label class="block text-sm font-medium mb-2">Kata Sandi</label><input type="password" id="password" required autocomplete="new-password" class="w-full px-4 py-2 border rounded-lg outline-none" placeholder="••••••••"></div>
+                    <div class="mb-5"><label class="block text-sm font-medium mb-2">Email *</label><input type="email" id="email" required autocomplete="new-email" class="w-full px-4 py-2 border rounded-lg outline-none" placeholder="email@perusahaan.com"></div>
+                    <div class="mb-6"><label class="block text-sm font-medium mb-2">Kata Sandi *</label><input type="password" id="password" required autocomplete="new-password" class="w-full px-4 py-2 border rounded-lg outline-none" placeholder="••••••••"></div>
                     <button type="submit" id="btn-login" class="w-full bg-secondary hover:bg-blue-600 text-white font-semibold py-2.5 rounded-lg shadow flex justify-center items-center gap-2"><span>Masuk</span><i class="fas fa-arrow-right"></i></button>
                 </form>
             </div>
@@ -172,14 +172,6 @@
                 <a href="#" onclick="navigate('settings')" id="nav-settings" data-roles="manager,produksi,vendor" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg text-blue-200 hover:bg-blue-800 hover:text-white"><i class="fas fa-cog w-5"></i> Pengaturan API</a>
             </nav>
             <div class="p-4 border-t border-blue-800 flex flex-col gap-2">
-                <div class="bg-blue-900/80 p-2 rounded text-xs border border-blue-700">
-                    <label class="block text-[10px] text-blue-300 font-bold mb-1"><i class="fas fa-exchange-alt mr-1"></i> Switch Role (Demo):</label>
-                    <select id="quick-role-switch" onchange="switchRoleDemo(this.value)" class="w-full bg-blue-950 text-white p-1 rounded border border-blue-600 text-xs font-semibold outline-none">
-                        <option value="manager">👔 Manager</option>
-                        <option value="produksi">🛠️ Pimpinan Produksi</option>
-                        <option value="vendor">🚚 Vendor / Supplier</option>
-                    </select>
-                </div>
                 <a href="#" onclick="logout()" class="flex items-center gap-3 px-4 py-2 rounded-lg text-red-300 hover:bg-red-900/50"><i class="fas fa-sign-out-alt w-5"></i> Keluar</a>
             </div>
         </aside>
@@ -385,11 +377,13 @@
         // =========================================================================
         const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwSPFmfoVEg1JUwJG0USZwl5K3XKNBX3b9ZnaUYQEBVwO3dHmDApKNDpQdMsVtA5jFC/exec";
 
+        // REAL DATASET INITIALIZATION (CLEAN / EMPTY)
         let projects = []; let reports = []; let tasks = []; let rabs = []; let inventories = []; let documents = []; 
         let meetings = []; let checklists = []; let specDocs = [];
         let currentProjectId = null; let currentUnitUpdateId = null; let authMode = 'login';
         let currentUserRole = 'manager';
         let currentUserName = 'Pengguna';
+        let currentUserEmail = '';
         const isAppScript = typeof google !== 'undefined' && typeof google.script !== 'undefined';
         let customSignatures = JSON.parse(localStorage.getItem('customSignaturesList')) || [];
         let confirmCallback = null;
@@ -403,14 +397,27 @@
 
             renderSignatureList();
             
-            // Mockup Lokal default jika API belum disetel
-            projects = [{ id: 1, name: "Pengadaan Ambulance SPK-01", manager: "Budi Santoso", start: "2026-06-01", end: "2026-07-01", progress: 40, status: "Berjalan", agency: "RSUD Cirebon", contractValue: 850000000, units: [ {id: "U1", brand:"Toyota Hilux 4x4", year:"2026", chassis:"MHK111823", engine:"1KD11155", progress:30}, {id: "U2", brand:"Toyota Hilux 4x4", year:"2026", chassis:"MHK222941", engine:"1KD22288", progress:50} ] }];
-            reports = [];
+            // Periksa apakah pengguna sudah punya sesi aktif
+            const savedSession = localStorage.getItem('user_session');
+            if (savedSession) {
+                try {
+                    const sess = JSON.parse(savedSession);
+                    currentUserRole = sess.role;
+                    currentUserName = sess.name;
+                    currentUserEmail = sess.email;
+
+                    document.getElementById('login-view').classList.add('hidden');
+                    document.getElementById('app-view').classList.remove('hidden');
+                    applyRolePermissions();
+                    initApp();
+                } catch(e) {
+                    localStorage.removeItem('user_session');
+                }
+            }
         });
 
         // --- HTTP API CONNECTOR TO GOOGLE APPS SCRIPT ---
         async function apiCall(action, payload = {}) {
-            // Prioritaskan GAS_API_URL yang terpasang langsung di dalam kode (non-interface)
             const apiUrl = (GAS_API_URL && !GAS_API_URL.includes("YOUR_SCRIPT_ID_HERE")) 
                 ? GAS_API_URL 
                 : (localStorage.getItem('gas_api_url') || "");
@@ -425,7 +432,7 @@
             }
 
             if (!apiUrl) {
-                console.warn("URL API Google Apps Script belum dikonfigurasi pada variabel GAS_API_URL. Menggunakan data lokal.");
+                console.warn("URL API Google Apps Script belum dikonfigurasi.");
                 return { status: "local", message: "Mode Offline / Lokal" };
             }
 
@@ -450,7 +457,7 @@
             if(!statusTxt) return;
 
             if(!apiUrl) {
-                statusTxt.innerHTML = `<span class="text-amber-600 font-bold"><i class="fas fa-exclamation-circle mr-1"></i> Belum mengisi GAS_API_URL di kode. Berjalan pada Mode Lokal.</span>`;
+                statusTxt.innerHTML = `<span class="text-amber-600 font-bold"><i class="fas fa-exclamation-circle mr-1"></i> Belum mengisi GAS_API_URL pada kode.</span>`;
                 return;
             }
             statusTxt.innerHTML = `<span class="loader border-secondary w-3 h-3 mr-1"></span> Menguji koneksi ke Google Sheets...`;
@@ -463,7 +470,7 @@
                     statusTxt.innerHTML = `<span class="text-red-600 font-bold"><i class="fas fa-times-circle mr-1"></i> Respons tidak valid.</span>`;
                 }
             } catch(e) {
-                statusTxt.innerHTML = `<span class="text-red-600 font-bold"><i class="fas fa-times-circle mr-1"></i> Gagal terhubung ke API Apps Script. Periksa URL atau izin deploy Web App.</span>`;
+                statusTxt.innerHTML = `<span class="text-red-600 font-bold"><i class="fas fa-times-circle mr-1"></i> Gagal terhubung ke Apps Script API. Periksa URL deployment.</span>`;
             }
         }
 
@@ -472,10 +479,8 @@
             const badge = document.getElementById('sidebar-role-badge');
             const userDisp = document.getElementById('sidebar-user-name');
             const avatar = document.getElementById('user-avatar-img');
-            const quickSelect = document.getElementById('quick-role-switch');
             
             userDisp.innerText = currentUserName || "Pengguna";
-            if (quickSelect) quickSelect.value = currentUserRole;
 
             if (currentUserRole === 'manager') {
                 badge.innerText = "👔 Manager";
@@ -500,13 +505,6 @@
                     item.classList.add('hidden');
                 }
             });
-        }
-
-        function switchRoleDemo(roleVal) {
-            currentUserRole = roleVal;
-            applyRolePermissions();
-            showToast(`Peran dialihkan ke: ${roleVal.toUpperCase()}`);
-            navigate('dashboard');
         }
 
         // --- CUSTOM CONFIRMATION & TOAST ---
@@ -535,37 +533,85 @@
             });
             const badge = document.getElementById('notif-badge'); const container = document.getElementById('notif-list-container');
             if(notifs.length > 0) { badge.innerText = notifs.length; badge.classList.remove('hidden'); container.innerHTML = notifs.map(n => `<div class="mb-2 p-2 text-sm border rounded ${n.type==='danger'?'bg-red-50 text-red-800':'bg-amber-50 text-amber-800'}"><i class="fas ${n.icon} mr-2"></i>${n.text}</div>`).join(''); } 
-            else { badge.classList.add('hidden'); container.innerHTML = `<div class="text-center text-gray-500">Aman.</div>`; }
+            else { badge.classList.add('hidden'); container.innerHTML = `<div class="text-center text-gray-500">Tidak ada pengingat tenggat.</div>`; }
         }
 
         function openNotifModal() { document.getElementById('modal-notif').classList.remove('hidden'); }
-        function toggleAuth(mode) { authMode = mode; document.getElementById('reg-name-group').classList.toggle('hidden', mode === 'login'); document.getElementById('btn-login').innerHTML = mode === 'login' ? '<span>Masuk</span><i class="fas fa-arrow-right"></i>' : '<span>Daftar</span><i class="fas fa-user-plus"></i>'; }
+        function toggleAuth(mode) { 
+            authMode = mode; 
+            document.getElementById('reg-name-group').classList.toggle('hidden', mode === 'login'); 
+            document.getElementById('tab-login').className = mode === 'login' ? 'flex-1 py-1.5 text-sm font-bold bg-white text-primary rounded shadow-sm' : 'flex-1 py-1.5 text-sm font-bold text-blue-200';
+            document.getElementById('tab-register').className = mode === 'register' ? 'flex-1 py-1.5 text-sm font-bold bg-white text-primary rounded shadow-sm' : 'flex-1 py-1.5 text-sm font-bold text-blue-200';
+            document.getElementById('btn-login').innerHTML = mode === 'login' ? '<span>Masuk</span><i class="fas fa-arrow-right"></i>' : '<span>Daftar Akun Baru</span><i class="fas fa-user-plus"></i>'; 
+        }
         function showToast(msg) { const t = document.getElementById('toast'); document.getElementById('toast-message').innerText = msg; t.classList.remove('translate-x-full'); setTimeout(() => t.classList.add('translate-x-full'), 3000); }
         
-        function handleLogin(e) { 
+        async function handleLogin(e) { 
             e.preventDefault(); 
-            const emailVal = document.getElementById('email').value;
+            const emailVal = document.getElementById('email').value.trim();
+            const passwordVal = document.getElementById('password').value;
             const roleSelect = document.getElementById('user-role-select').value;
-            const regName = document.getElementById('reg-name').value;
+            const regName = document.getElementById('reg-name').value.trim();
 
-            currentUserRole = roleSelect;
-            currentUserName = regName || emailVal.split('@')[0] || "Pengguna";
+            const btn = document.getElementById('btn-login');
+            btn.disabled = true;
 
-            document.getElementById('login-view').classList.add('hidden'); 
-            document.getElementById('app-view').classList.remove('hidden'); 
-            
-            applyRolePermissions();
-            initApp(); 
+            if (authMode === 'register') {
+                if (!regName) { showToast("Masukkan nama lengkap Anda!"); btn.disabled = false; return; }
+                btn.innerHTML = '<span class="loader border-white w-4 h-4 border-t-transparent mr-1"></span> Mendaftarkan...';
+                
+                const res = await apiCall("registerUserDB", { name: regName, email: emailVal, password: passwordVal, role: roleSelect });
+                btn.disabled = false;
+                
+                if (res.status === "success" && res.user) {
+                    showToast("Akun Berhasil Didaftarkan!");
+                    currentUserRole = res.user.role;
+                    currentUserName = res.user.name;
+                    currentUserEmail = res.user.email;
+                    localStorage.setItem('user_session', JSON.stringify({ name: currentUserName, email: currentUserEmail, role: currentUserRole }));
+                    
+                    document.getElementById('login-view').classList.add('hidden'); 
+                    document.getElementById('app-view').classList.remove('hidden'); 
+                    applyRolePermissions();
+                    initApp(); 
+                } else {
+                    showToast(res.message || "Gagal mendaftar.");
+                    btn.innerHTML = '<span>Daftar Akun Baru</span><i class="fas fa-user-plus"></i>';
+                }
+            } else {
+                btn.innerHTML = '<span class="loader border-white w-4 h-4 border-t-transparent mr-1"></span> Memeriksa...';
+                const res = await apiCall("loginUserDB", { email: emailVal, password: passwordVal });
+                btn.disabled = false;
+
+                if (res.status === "success" && res.user) {
+                    showToast("Selamat Datang, " + res.user.name);
+                    currentUserRole = res.user.role;
+                    currentUserName = res.user.name;
+                    currentUserEmail = res.user.email;
+                    localStorage.setItem('user_session', JSON.stringify({ name: currentUserName, email: currentUserEmail, role: currentUserRole }));
+
+                    document.getElementById('login-view').classList.add('hidden'); 
+                    document.getElementById('app-view').classList.remove('hidden'); 
+                    applyRolePermissions();
+                    initApp();
+                } else {
+                    showToast(res.message || "Gagal masuk.");
+                    btn.innerHTML = '<span>Masuk</span><i class="fas fa-arrow-right"></i>';
+                }
+            }
         }
         
-        function logout() { location.reload(); }
+        function logout() { 
+            localStorage.removeItem('user_session');
+            location.reload(); 
+        }
 
         async function initApp() {
             testApiConnection();
-            const apiUrl = localStorage.getItem('gas_api_url');
+            const apiUrl = (GAS_API_URL && !GAS_API_URL.includes("YOUR_SCRIPT_ID_HERE")) ? GAS_API_URL : localStorage.getItem('gas_api_url');
 
             if (apiUrl || isAppScript) {
-                document.getElementById('dash-subtitle').innerHTML = '<span class="loader w-3 h-3 border-secondary border-t-transparent mr-1"></span> Mengambil data dari Google Sheets...';
+                document.getElementById('dash-subtitle').innerHTML = '<span class="loader w-3 h-3 border-secondary border-t-transparent mr-1"></span> Mengambil data real dari Google Sheets...';
                 
                 if (isAppScript) {
                     google.script.run.withSuccessHandler(function(data) {
@@ -579,7 +625,7 @@
                             applyRemoteData(json.data);
                         }
                     } catch(e) {
-                        document.getElementById('dash-subtitle').innerText = "Menggunakan data lokal (Offline).";
+                        document.getElementById('dash-subtitle').innerText = "Belum terhubung ke server database.";
                     }
                 }
             } else {
@@ -597,7 +643,7 @@
             meetings = data.meetings || [];
             checklists = data.checklists || [];
             specDocs = documents.filter(d=>d.name && d.name.includes("SPEC_"));
-            document.getElementById('dash-subtitle').innerText = "Data tersinkronisasi dari Google Sheets."; 
+            document.getElementById('dash-subtitle').innerText = "Database terhubung & aktif (Real Production Mode)."; 
             checkNotifications(); 
             renderDashboard(); 
             navigate('dashboard');
@@ -608,7 +654,7 @@
             if (targetNav) {
                 const allowedRoles = targetNav.getAttribute('data-roles') ? targetNav.getAttribute('data-roles').split(',') : ['manager'];
                 if (!allowedRoles.includes(currentUserRole)) {
-                    showToast("Akses Dibatasi: Jobdesk Anda tidak diizinkan membuka menu ini!");
+                    showToast("Akses Dibatasi: Peran Anda tidak diizinkan membuka menu ini!");
                     return;
                 }
             }
@@ -643,6 +689,10 @@
             document.getElementById('stat-total').innerText = total; document.getElementById('stat-active').innerText = active; document.getElementById('stat-progress').innerText = avg+'%';
             
             const tbody = document.getElementById('dashboard-table-body'); tbody.innerHTML = '';
+            if (projects.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-gray-400">Belum ada proyek terdaftar di database. Klik <b>Data Entry Baru</b> untuk membuat proyek pertama.</td></tr>`;
+                return;
+            }
             projects.slice(-5).reverse().forEach(p => {
                 let unitCount = p.units ? p.units.length : 0;
                 tbody.innerHTML += `<tr class="hover:bg-gray-50 cursor-pointer" onclick="openDetail(${p.id})"><td class="px-6 py-4"><b>${p.name}</b><br><span class="text-xs text-gray-500">${p.agency || '-'}</span></td><td class="px-6 py-4 text-xs font-bold text-gray-600">${unitCount} Unit</td><td class="px-6 py-4"><span class="px-2 py-1 text-[10px] font-bold rounded ${getStatusColor(p.status)}">${p.status}</span></td><td class="px-6 py-4 font-bold text-secondary">${p.progress}%</td></tr>`;
@@ -651,6 +701,10 @@
 
         function renderProjects() {
             const c = document.getElementById('project-cards-container'); c.innerHTML = '';
+            if (projects.length === 0) {
+                c.innerHTML = `<div class="col-span-full bg-white p-8 text-center rounded-xl border"><i class="fas fa-folder-open text-4xl text-gray-300 mb-3"></i><p class="text-gray-500 text-sm">Belum ada proyek. Tambahkan proyek baru pada menu Data Entry.</p></div>`;
+                return;
+            }
             projects.forEach(p => {
                 let uCount = p.units ? p.units.length : 0;
                 c.innerHTML += `<div class="bg-white rounded-xl shadow-sm border p-5 cursor-pointer hover:shadow-md transition-all" onclick="openDetail(${p.id})">
@@ -665,6 +719,10 @@
 
         function renderTimeline() {
             const c = document.getElementById('timeline-container'); c.innerHTML = '';
+            if (projects.length === 0) {
+                c.innerHTML = `<p class="text-sm text-gray-400">Lini masa kosong. Tambahkan proyek baru terlebih dahulu.</p>`;
+                return;
+            }
             [...projects].sort((a,b)=>new Date(a.start)-new Date(b.start)).forEach(p => {
                 c.innerHTML += `<div class="relative pl-6"><div class="absolute -left-2 top-2 w-4 h-4 rounded-full ${p.progress>=100?'bg-emerald-500':'bg-secondary'} ring-4 ring-gray-100"></div><div class="bg-gray-50 p-3 rounded border"><span class="text-xs text-gray-500 block">${p.start} - ${p.end}</span><h3 class="font-bold">${p.name}</h3><span class="text-xs text-secondary font-bold">${p.progress}%</span></div></div>`;
             });
@@ -679,10 +737,10 @@
                 <div class="unit-entry-row bg-blue-50 p-4 border border-blue-100 rounded-lg relative" data-uid="${uid}">
                     <button type="button" onclick="this.parentElement.remove()" class="absolute top-2 right-2 text-red-500 hover:text-red-700 bg-white rounded-full w-6 h-6 shadow flex items-center justify-center text-xs"><i class="fas fa-times"></i></button>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><label class="block text-xs font-bold text-gray-700 mb-1">Merk / Type</label><input type="text" class="u-brand w-full px-3 py-1.5 border rounded outline-none text-sm" placeholder="Cth: Hino Dutro / Toyota Hilux" required></div>
-                        <div><label class="block text-xs font-bold text-gray-700 mb-1">Tahun Kendaraan</label><input type="text" class="u-year w-full px-3 py-1.5 border rounded outline-none text-sm" placeholder="Cth: 2026" required></div>
-                        <div><label class="block text-xs font-bold text-gray-700 mb-1">Nomor Rangka</label><input type="text" class="u-chassis w-full px-3 py-1.5 border rounded outline-none text-sm" required></div>
-                        <div><label class="block text-xs font-bold text-gray-700 mb-1">Nomor Mesin</label><input type="text" class="u-engine w-full px-3 py-1.5 border rounded outline-none text-sm" required></div>
+                        <div><label class="block text-xs font-bold text-gray-700 mb-1">Merk / Type *</label><input type="text" class="u-brand w-full px-3 py-1.5 border rounded outline-none text-sm" placeholder="Cth: Hino Dutro / Toyota Hilux" required></div>
+                        <div><label class="block text-xs font-bold text-gray-700 mb-1">Tahun Kendaraan *</label><input type="text" class="u-year w-full px-3 py-1.5 border rounded outline-none text-sm" placeholder="Cth: 2026" required></div>
+                        <div><label class="block text-xs font-bold text-gray-700 mb-1">Nomor Rangka *</label><input type="text" class="u-chassis w-full px-3 py-1.5 border rounded outline-none text-sm" required></div>
+                        <div><label class="block text-xs font-bold text-gray-700 mb-1">Nomor Mesin *</label><input type="text" class="u-engine w-full px-3 py-1.5 border rounded outline-none text-sm" required></div>
                     </div>
                 </div>
             `;
@@ -708,7 +766,7 @@
                 });
 
                 const np = {
-                    id: new Date().getTime(), name: document.getElementById('p_name').value, manager: document.getElementById('p_manager').value || '',
+                    id: new Date().getTime(), name: document.getElementById('p_name').value, manager: document.getElementById('p_manager').value || currentUserName,
                     start: document.getElementById('p_start').value, end: document.getElementById('p_end').value, progress: 0, status: 'Baru Dimulai',
                     contractNo: document.getElementById('p_contract_no').value, contractValue: document.getElementById('p_contract_value').value,
                     agency: document.getElementById('p_agency').value, agencyAddress: document.getElementById('p_agency_address').value,
@@ -1142,7 +1200,7 @@
 
         function openMatrixModal(){ if(!currentProjectId)return; const p=projects.find(x=>x.id===currentProjectId); document.getElementById('matrix-title').value=`TIME LINE ACTIVITY ${p.name.toUpperCase()}`; document.getElementById('modal-matrix').classList.remove('hidden'); }
         function closeMatrixModal(){ document.getElementById('modal-matrix').classList.add('hidden'); }
-        function executePrintMatrix(){ closeMatrixModal(); if(!currentProjectId)return; const p=projects.find(x=>x.id===currentProjectId); const tsk=tasks.filter(x=>x.projectId===currentProjectId).sort((a,b)=>new Date(a.start)-new Date(b.start)); const kop=localStorage.getItem('customKopBase64')||'kop.jpg'; let sd=new Date(p.start); let ed=new Date(p.end); tsk.forEach(t=>{let ts=new Date(t.start); let te=new Date(t.end); if(ts<sd)sd=ts; if(te>ed)ed=te;}); let sy=sd.getFullYear(); let sm=sd.getMonth(); let ey=ed.getFullYear(); let em=ed.getMonth(); let mx=[]; const mName=["JAN","FEB","MAR","APR","MEI","JUN","JUL","AGU","SEP","OKT","NOV","DES"]; for(let y=sy; y<=ey; y++){let ms=(y===sy)?sm:0; let me=(y===ey)?em:11; for(let m=ms; m<=me; m++) mx.push({y:y, m:m+1, n:mName[m]});} let h1='', h2=''; mx.forEach(m=>{h1+=`<th colspan="4" style="border:1px solid #000; font-size:8pt;">${m.n} ${m.y}</th>`; h2+=`<th style="border:1px solid #000; font-size:8pt; width:20px;">W1</th><th style="border:1px solid #000; font-size:8pt; width:20px;">W2</th><th style="border:1px solid #000; font-size:8pt; width:20px;">W3</th><th style="border:1px solid #000; font-size:8pt; width:20px;">W4</th>`;}); function check(ts,te,y,m,w){ let ws=(w-1)*7+1; let we=w===4?31:w*7; let ds=new Date(y,m-1,ws,0,0,0); let de=new Date(y,m-1,Math.min(we,new Date(y,m,0).getDate()),23,59,59); let t1=new Date(ts); t1.setHours(0,0,0,0); let t2=new Date(te); t2.setHours(23,59,59,999); if(t1<=de && t2>=ds){ let tt=[]; if(t1>=ds&&t1<=de)tt.push(t1.getDate()); if(t2>=ds&&t2<=de&&t1.getTime()!==t2.getTime())tt.push(t2.getDate()); return tt.join('-'); } return null; } let bh=''; if(tsk.length===0)bh=`<tr><td colspan="${3+mx.length*4}">Kosong</td></tr>`; else tsk.forEach((t,i)=>{bh+=`<tr><td style="border:1px solid #000; font-size:8pt; text-align:center;">${i+1}</td><td style="border:1px solid #000; font-size:8pt; font-weight:bold;">${t.name}</td><td style="border:1px solid #000; font-size:8pt;">${t.pic}</td>`; mx.forEach(m=>{for(let w=1;w<=4;w++){let dt=check(t.start,t.end,m.y,m.m,w); if(dt!==null)bh+=`<td style="border:1px solid #000; background-color:red; color:white; font-size:7pt; text-align:center;">${dt}</td>`; else bh+=`<td style="border:1px solid #000;"></td>`;}}); bh+='</tr>';}); const html=`<div style="font-family:Arial; padding:10px;"><div style="text-align:center; margin-bottom:10px;"><img src="${kop}" style="width:100%; object-fit:contain; display:block; margin:0 auto;"></div><h3 style="text-align:center; font-size:12pt; margin-bottom:10px;">${document.getElementById('matrix-title').value}</h3><table style="width:100%; border-collapse:collapse; text-align:left;"><thead><tr><th rowspan="2" style="border:1px solid #000; font-size:8pt;">NO</th><th rowspan="2" style="border:1px solid #000; font-size:8pt;">PEKERJAAN</th><th rowspan="2" style="border:1px solid #000; font-size:8pt;">PIC</th>${h1}</tr><tr>${h2}</tr></thead><tbody>${bh}</tbody></table><div style="margin-top:10px; font-size:8pt;"><b>CATATAN:</b><br>${document.getElementById('matrix-notes').value.replace(/\n/g,'<br>')}</div></div>`; document.getElementById('print-area').innerHTML=html; let st=document.getElementById('dyn-print'); if(!st){st=document.createElement('style'); st.id='dyn-print'; document.head.appendChild(st);} st.innerHTML=`@media print{@page{size:A4 landscape; margin:10mm;}}`; setTimeout(()=>window.print(), 500); }
+        function executePrintMatrix(){ closeMatrixModal(); if(!currentProjectId)return; const p=projects.find(x=>x.id===currentProjectId); const tsk=tasks.filter(x=>x.projectId===currentProjectId).sort((a,b)=>new Date(a.start)-new Date(b.start)); const kop=localStorage.getItem('customKopBase64')||'kop.jpg'; let sd=new Date(p.start); let ed=new Date(p.end); tsk.forEach(t=>{let ts=new Date(t.start); let te=new Date(t.end); if(ts<sd)sd=ts; if(te>ed)ed=te;}); let sy=sd.getFullYear(); let sm=sd.getMonth(); let ey=ed.getFullYear(); let em=ed.getMonth(); let mx=[]; const mName=["JAN","FEB","MAR","APR","MEI","JUN","JUL","AGU","SEP","OKT","NOV","DES"]; for(let y=sy; y<=ey; y++){let ms=(y===sy)?sm:0; let me=(y===ey)?em:11; for(let m=ms; m<=me; m++) mx.push({y:y, m:m+1, n:mName[m]});} let h1='', h2=''; mx.forEach(m=>{h1+=`<th colspan="4" style="border:1px solid #000; font-size:8pt;">${m.n} ${m.y}</th>`; h2+=`<th style="border:1px solid #000; font-size:8pt; width:20px;">W1</th><th style="border:1px solid #000; font-size:8pt; width:20px;">W2</th><th style="border:1px solid #000; font-size:8pt; width:20px;">W3</th><th style="border:1px solid #000; font-size:8pt; width:20px;">W4</th>`;}); function check(ts,te,y,m,w){ let ws=(w-1)*7+1; let we=w===4?31:w*7; let ds=new Date(y,m-1,ws,0,0,0); let de=new Date(y,m-1,Math.min(we,new Date(y,m,0).getDate()),23,59,59); let t1=new Date(ts); t1.setHours(0,0,0,0); let t2=new Date(te); t2.setHours(23,59,59,999); if(t1<=de && t2>=ds){ let tt=[]; if(t1>=ds&&t1<=de)tt.push(t1.getDate()); if(t2>=ds&&t2<=de&&t1.getTime()!==t2.getTime())tt.push(t2.getDate()); return tt.join('-'); } return null; } let bh=''; if(tsk.length===0)bh=`<tr><td colspan="${3+mx.length*4}">Kosong</td></tr>`; else tsk.forEach((t,i)=>{bh+=`<tr><td style="border:1px solid #000; font-size:8pt; text-align:center;">${i+1}</td><td style="border:1px solid #000; font-size:8pt; font-weight:bold;">${t.name}</td><td style="border:1px solid #000; font-size:8pt;">${t.pic}</td>`; mx.forEach(m=>{for(let w=1;w<=4;w++){let dt=check(t.start,t.end,m.y,m.m,w); if(dt!==null)bh+=`<td style="border:1px solid #000; background-color:red; color:white; font-size:7pt; text-align:center;">${dt}</td>`; else bh+=`<td style="border:1px solid #000;"></td>`;}}); bh+='0</tr>';}); const html=`<div style="font-family:Arial; padding:10px;"><div style="text-align:center; margin-bottom:10px;"><img src="${kop}" style="width:100%; object-fit:contain; display:block; margin:0 auto;"></div><h3 style="text-align:center; font-size:12pt; margin-bottom:10px;">${document.getElementById('matrix-title').value}</h3><table style="width:100%; border-collapse:collapse; text-align:left;"><thead><tr><th rowspan="2" style="border:1px solid #000; font-size:8pt;">NO</th><th rowspan="2" style="border:1px solid #000; font-size:8pt;">PEKERJAAN</th><th rowspan="2" style="border:1px solid #000; font-size:8pt;">PIC</th>${h1}</tr><tr>${h2}</tr></thead><tbody>${bh}</tbody></table><div style="margin-top:10px; font-size:8pt;"><b>CATATAN:</b><br>${document.getElementById('matrix-notes').value.replace(/\n/g,'<br>')}</div></div>`; document.getElementById('print-area').innerHTML=html; let st=document.getElementById('dyn-print'); if(!st){st=document.createElement('style'); st.id='dyn-print'; document.head.appendChild(st);} st.innerHTML=`@media print{@page{size:A4 landscape; margin:10mm;}}`; setTimeout(()=>window.print(), 500); }
 
         function handleKopUpload(i){const f=i.files[0]; if(!f)return; const r=new FileReader(); r.onload=function(e){const b=e.target.result; document.getElementById('kop-preview').src=b; localStorage.setItem('customKopBase64',b); showToast("Kop Diubah!");}; r.readAsDataURL(f);}
         function saveNewSignature(){const n=document.getElementById('sig-new-name').value; const fi=document.getElementById('sig-upload'); if(!n||!fi.files[0])return; const r=new FileReader(); r.onload=function(e){customSignatures.push({name:n, base64:e.target.result}); localStorage.setItem('customSignaturesList',JSON.stringify(customSignatures)); document.getElementById('sig-new-name').value=''; fi.value=''; renderSignatureList(); showToast("TTD Disimpan!");}; r.readAsDataURL(fi.files[0]);}
