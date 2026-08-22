@@ -842,6 +842,33 @@
             apiCall("updateProjectProgressAndUnitsDB", { id: p.id, progress: p.progress, unitsStr: JSON.stringify(p.units) });
         }
 
+        function formatImageUrl(url) {
+            if (!url) return '';
+            url = url.trim();
+            if (url.startsWith('data:image')) return url;
+            
+            const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
+            if (driveMatch && driveMatch[1]) {
+                return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
+            }
+            return url;
+        }
+
+        function parsePhotoUrls(photoUrlStr) {
+            if (!photoUrlStr) return [];
+            if (photoUrlStr.includes('|||')) {
+                return photoUrlStr.split('|||').map(s => s.trim()).filter(Boolean);
+            }
+            const urls = [];
+            const regex = /(data:image\/[a-zA-Z+]+;base64,[^,|]+|https?:\/\/[^\s,|]+)/g;
+            let match;
+            while ((match = regex.exec(photoUrlStr)) !== null) {
+                urls.push(match[0]);
+            }
+            if (urls.length > 0) return urls;
+            return photoUrlStr.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
         let reportPhotosArray = [];
         function handleReportPhoto(input) {
             Array.from(input.files).forEach(file => {
@@ -890,7 +917,7 @@
 
                 const nr = { id: new Date().getTime(), projectId: pId, unitId: uId, date: document.getElementById('report-date').value, progress: newProg, desc: document.getElementById('report-desc').value, photos: reportPhotosArray, updatedUnitsStr: JSON.stringify(p.units), overallProgress: p.progress };
 
-                nr.photoUrl = reportPhotosArray.map(x=>x.dataUrl).join(','); reports.push(nr);
+                nr.photoUrl = reportPhotosArray.map(x=>x.dataUrl).join('|||'); reports.push(nr);
                 btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Laporan'; btn.disabled = false;
                 reportPhotosArray=[]; renderReportPhotoGrid(); renderReportHistory(pId); document.getElementById('report-desc').value=''; showToast("Laporan Disimpan!");
 
@@ -912,10 +939,10 @@
                 let photoGridHtml = '';
                 
                 if(r.photoUrl && r.photoUrl !== "") {
-                    let urls = r.photoUrl.split(',');
+                    let urls = parsePhotoUrls(r.photoUrl);
                     photoGridHtml = `<div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-200">` + urls.map(url => {
-                        let imgSrc = url.startsWith('data:image') ? url : url;
-                        return `<a href="${url}" target="_blank" title="Buka Gambar Asli"><img src="${imgSrc}" onerror="this.onerror=null; this.src='https://placehold.co/100x100?text=Buka+Gambar'; this.parentElement.href=this.src;" class="h-16 w-16 object-cover rounded border border-gray-300 hover:opacity-80 transition-opacity"></a>`;
+                        let displayUrl = formatImageUrl(url);
+                        return `<a href="${url}" target="_blank" title="Buka Gambar Asli"><img src="${displayUrl}" onerror="this.onerror=null; this.src='https://placehold.co/100x100/f1f5f9/94a3b8?text=Error';" class="h-16 w-16 object-cover rounded border border-gray-300 hover:opacity-80 transition-opacity"></a>`;
                     }).join('') + `</div>`;
                 }
 
@@ -934,60 +961,6 @@
             });
         }
 
-        function deleteReport(id) {
-            confirmAction("Anda yakin ingin menghapus laporan ini?", () => {
-                reports = reports.filter(r => r.id !== id);
-                const pId = parseInt(document.getElementById('report-project-select').value);
-                renderReportHistory(pId);
-                showToast("Laporan Berhasil Dihapus!");
-                apiCall("deleteReportDB", { id });
-            });
-        }
-
-        function openEditReport(id) {
-            const r = reports.find(x => x.id === id);
-            if(!r) return;
-            document.getElementById('edit-report-id').value = r.id;
-            document.getElementById('edit-report-pid').value = r.projectId;
-            document.getElementById('edit-report-uid').value = r.unitId;
-            document.getElementById('edit-report-progress').value = r.progress;
-            document.getElementById('edit-report-desc').value = r.desc;
-            document.getElementById('modal-edit-report').classList.remove('hidden');
-        }
-
-        function submitEditReport(e) {
-            e.preventDefault();
-            const id = parseInt(document.getElementById('edit-report-id').value);
-            const pid = parseInt(document.getElementById('edit-report-pid').value);
-            const uid = document.getElementById('edit-report-uid').value;
-            const newProg = parseInt(document.getElementById('edit-report-progress').value);
-            const newDesc = document.getElementById('edit-report-desc').value;
-
-            const r = reports.find(x => x.id === id);
-            if(r) {
-                r.progress = newProg;
-                r.desc = newDesc;
-            }
-
-            const p = projects.find(x => x.id === pid);
-            if(p) {
-                const u = p.units.find(x => x.id === uid);
-                if(u) u.progress = newProg;
-                let sum = p.units.reduce((acc, curr) => acc + curr.progress, 0); 
-                p.progress = Math.round(sum / p.units.length); 
-                p.status = p.progress >= 100 ? 'Selesai' : 'Berjalan';
-            }
-
-            document.getElementById('modal-edit-report').classList.add('hidden');
-            renderReportHistory(pid);
-            showToast("Laporan Diperbarui!");
-
-            apiCall("editReportDB", {
-                id: id, projectId: pid, unitId: uid, progress: newProg, desc: newDesc,
-                updatedUnitsStr: JSON.stringify(p.units), overallProgress: p.progress
-            });
-        }
-
         function downloadSingleReport(id) {
             const r = reports.find(x => x.id === id);
             if(!r) return;
@@ -997,8 +970,11 @@
             
             let photoHtml = '';
             if(r.photoUrl && r.photoUrl !== "") {
-                let urls = r.photoUrl.split(',');
-                let grid = urls.map(url => `<div style="width:30%; display:inline-block; margin:5px;"><img src="${url}" onerror="this.style.display='none'" style="width:100%; height:200px; object-fit:cover; border:1px solid #ccc;"></div>`).join('');
+                let urls = parsePhotoUrls(r.photoUrl);
+                let grid = urls.map(url => {
+                    let displayUrl = formatImageUrl(url);
+                    return `<div style="width:30%; display:inline-block; margin:5px;"><img src="${displayUrl}" onerror="this.style.display='none'" style="width:100%; height:200px; object-fit:cover; border:1px solid #ccc;"></div>`;
+                }).join('');
                 photoHtml = `<div style="margin-top:20px; page-break-before: always;"><h4 style="font-size:11pt; text-decoration:underline;">Lampiran Foto Progres:</h4><br>${grid}</div>`;
             }
 
